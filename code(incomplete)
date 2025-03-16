@@ -1,0 +1,72 @@
+from fastapi import FastAPI, Query
+import requests
+from bs4 import BeautifulSoup
+
+app = FastAPI()
+
+def fetch_asos_products(query):
+    url = "https://asos2.p.rapidapi.com/products/v2/list"
+    headers = {
+        "X-RapidAPI-Key": "d471f710e0msh7297125fd67a5ddp1e624bjsna08928b44335",
+        "X-RapidAPI-Host": "asos2.p.rapidapi.com",
+    }
+    params = {"store": "US", "limit": "5", "q": query}
+    response = requests.get(url, headers=headers, params=params)
+    return response.json().get("products", [])
+
+def fetch_hm_products(query):
+    url = f"https://www2.hm.com/en_us/search-results.html?q={query}"
+    headers = {"User-Agent": "Mozilla/5.0"}
+    response = requests.get(url, headers=headers)
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    products = []
+    for item in soup.select(".product-item"):
+        products.append({
+            "name": item.select_one(".item-heading").text.strip(),
+            "price": item.select_one(".price").text.strip(),
+            "url": "https://www2.hm.com" + item.select_one("a")["href"]
+        })
+
+    return products
+
+def fetch_myntra_products(query):
+    url = f"https://www.myntra.com/{query}"
+    headers = {"User-Agent": "Mozilla/5.0"}
+    response = requests.get(url, headers=headers)
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    products = []
+    for item in soup.select(".product-base"):
+        products.append({
+            "name": item.select_one(".product-product").text.strip(),
+            "price": item.select_one(".product-discountedPrice, .product-price").text.strip(),
+            "url": "https://www.myntra.com" + item.select_one("a")["href"]
+        })
+
+    return products
+
+def fetch_zara_products(query):
+    url = f"https://www.zara.com/in/en/search?searchTerm={query}"
+    headers = {"User-Agent": "Mozilla/5.0"}
+    response = requests.get(url, headers=headers)
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    products = []
+    for item in soup.select(".product-grid-product"):
+        products.append({
+            "name": item.select_one(".product-link-name").text.strip(),
+            "price": item.select_one(".price").text.strip(),
+            "url": "https://www.zara.com" + item.select_one("a")["href"]
+        })
+
+    return products
+
+@app.get("/compare")
+def compare_products(query: str = Query(...)):
+    return {
+        "ASOS": fetch_asos_products(query),
+        "H&M": fetch_hm_products(query),
+        "Myntra": fetch_myntra_products(query),
+        "Zara": fetch_zara_products(query)
+    }
